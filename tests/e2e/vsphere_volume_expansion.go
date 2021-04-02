@@ -41,6 +41,8 @@ import (
 	fpod "k8s.io/kubernetes/test/e2e/framework/pod"
 	fpv "k8s.io/kubernetes/test/e2e/framework/pv"
 	storage_utils "k8s.io/kubernetes/test/e2e/storage/utils"
+
+	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
 
 var _ = ginkgo.Describe("Volume Expansion Test", func() {

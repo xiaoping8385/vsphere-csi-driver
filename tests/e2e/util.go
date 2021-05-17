@@ -103,6 +103,9 @@ func getVSphereStorageClassSpec(scName string, scParameters map[string]string, a
 	}
 	if scParameters != nil {
 		sc.Parameters = scParameters
+		if scParameters["csi.storage.k8s.io/fstype"] == "nfs4" {
+			sc.MountOptions = []string{"minorversion=1", "sec=sys"}
+		}
 	}
 	if allowedTopologies != nil {
 		sc.AllowedTopologies = []v1.TopologySelectorTerm{

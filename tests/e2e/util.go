@@ -82,7 +82,7 @@ var (
 )
 
 // getVSphereStorageClassSpec returns Storage Class Spec with supplied storage class parameters
-func getVSphereStorageClassSpec(scName string, scParameters map[string]string, allowedTopologies []v1.TopologySelectorLabelRequirement, scReclaimPolicy v1.PersistentVolumeReclaimPolicy, bindingMode storagev1.VolumeBindingMode, allowVolumeExpansion bool) *storagev1.StorageClass {
+func getVSphereStorageClassSpec(scName string, scParameters map[string]string, allowedTopologies []v1.TopologySelectorLabelRequirement, scReclaimPolicy v1.PersistentVolumeReclaimPolicy, bindingMode storagev1.VolumeBindingMode, allowVolumeExpansion bool, mountoption ...bool) *storagev1.StorageClass {
 	if bindingMode == "" {
 		bindingMode = storagev1.VolumeBindingImmediate
 	}
@@ -103,10 +103,15 @@ func getVSphereStorageClassSpec(scName string, scParameters map[string]string, a
 	}
 	if scParameters != nil {
 		sc.Parameters = scParameters
-		if scParameters["csi.storage.k8s.io/fstype"] == "nfs4" || scParameters["fstype"] == "nfs4"  {
-			sc.MountOptions = []string{"minorversion=1", "sec=sys"}
-		}
+		// if scParameters["csi.storage.k8s.io/fstype"] == "nfs4" || scParameters["fstype"] == "nfs4"  {
+		// 	sc.MountOptions = []string{"minorversion=1", "sec=sys"}
+		// }
 	}
+
+	if len(mountoption) > 0  {
+		sc.MountOptions = []string{"minorversion=1", "sec=sys"}
+	}
+
 	if allowedTopologies != nil {
 		sc.AllowedTopologies = []v1.TopologySelectorTerm{
 			{
@@ -290,9 +295,20 @@ func createPVCAndStorageClass(client clientset.Interface, pvcnamespace string, p
 	if len(names) > 0 {
 		scName = names[0]
 	}
-	storageclass, err := createStorageClass(client, scParameters, allowedTopologies, "", bindingMode, allowVolumeExpansion, scName)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
+	// if scParameters["csi.storage.k8s.io/fstype"] == "nfs4" || scParameters["fstype"] == "nfs4"  {
+		// 	sc.MountOptions = []string{"minorversion=1", "sec=sys"}
+		// }
+	var storageclass *storagev1.StorageClass
+	var err error
+	if accessMode == v1.ReadWriteMany {
+		storageclass, err = createStorageClass(client, scParameters, allowedTopologies, "", bindingMode, allowVolumeExpansion, scName, true)
+
+	}else{
+		storageclass, err = createStorageClass(client, scParameters, allowedTopologies, "", bindingMode, allowVolumeExpansion, scName)
+	}
+	  
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	pvclaim, err := createPVC(client, pvcnamespace, pvclaimlabels, ds, storageclass, accessMode)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -301,11 +317,20 @@ func createPVCAndStorageClass(client clientset.Interface, pvcnamespace string, p
 
 // createStorageClass helps creates a storage class with specified name, storageclass parameters
 func createStorageClass(client clientset.Interface, scParameters map[string]string, allowedTopologies []v1.TopologySelectorLabelRequirement,
-	scReclaimPolicy v1.PersistentVolumeReclaimPolicy, bindingMode storagev1.VolumeBindingMode, allowVolumeExpansion bool, scName string) (*storagev1.StorageClass, error) {
+	scReclaimPolicy v1.PersistentVolumeReclaimPolicy, bindingMode storagev1.VolumeBindingMode, allowVolumeExpansion bool, scName string, mountoption ...bool) (*storagev1.StorageClass, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ginkgo.By(fmt.Sprintf("Creating StorageClass %s with scParameters: %+v and allowedTopologies: %+v and ReclaimPolicy: %+v and allowVolumeExpansion: %t", scName, scParameters, allowedTopologies, scReclaimPolicy, allowVolumeExpansion))
-	storageclass, err := client.StorageV1().StorageClasses().Create(ctx, getVSphereStorageClassSpec(scName, scParameters, allowedTopologies, scReclaimPolicy, bindingMode, allowVolumeExpansion), metav1.CreateOptions{})
+	var storageclass *storagev1.StorageClass
+	var err error
+	if len(mountoption) > 0{
+        storageclass, err = client.StorageV1().StorageClasses().Create(ctx, getVSphereStorageClassSpec(scName, scParameters, allowedTopologies, scReclaimPolicy, bindingMode, allowVolumeExpansion, true), metav1.CreateOptions{})
+	} else {
+		storageclass, err = client.StorageV1().StorageClasses().Create(ctx, getVSphereStorageClassSpec(scName, scParameters, allowedTopologies, scReclaimPolicy, bindingMode, allowVolumeExpansion), metav1.CreateOptions{})
+	}
+	gomega.Expect(err).NotTo(gomega.HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
+	return storageclass, err
+	
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
 	return storageclass, err
 }

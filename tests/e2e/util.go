@@ -330,9 +330,7 @@ func createStorageClass(client clientset.Interface, scParameters map[string]stri
 	}
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
 	return storageclass, err
-	
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
-	return storageclass, err
+
 }
 
 // createPVC helps creates pvc with given namespace and labels using given storage class

@@ -1644,7 +1644,8 @@ func getPersistentVolumeSpecFromVolume(volumeID string, persistentVolumeReclaimP
 	// Annotation needed to delete a statically created pv
 	annotations := make(map[string]string)
 	annotations["pv.kubernetes.io/provisioned-by"] = e2evSphereCSIDriverName
-
+	mountoptions := []string{"minorversion=1", "sec=sys"}
+    
 	pv = &v1.PersistentVolume{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
@@ -1663,6 +1664,7 @@ func getPersistentVolumeSpecFromVolume(volumeID string, persistentVolumeReclaimP
 			},
 			ClaimRef:         claimRef,
 			StorageClassName: "",
+			MountOptions: mountoptions,
 		},
 		Status: v1.PersistentVolumeStatus{},
 	}

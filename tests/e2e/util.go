@@ -526,7 +526,7 @@ func getPersistentVolumeClaimSpec(namespace string, labels map[string]string, pv
 }
 
 // function to create PV volume spec with given FCD ID, Reclaim Policy and labels
-func getPersistentVolumeSpec(fcdID string, persistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy, labels map[string]string) *v1.PersistentVolume {
+func getPersistentVolumeSpec(fcdID string, persistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy, labels map[string]string, mountoption ...bool) *v1.PersistentVolume {
 	var (
 		pvConfig fpv.PersistentVolumeConfig
 		pv       *v1.PersistentVolume
@@ -544,7 +544,13 @@ func getPersistentVolumeSpec(fcdID string, persistentVolumeReclaimPolicy v1.Pers
 		},
 		Prebind: nil,
 	}
-
+	var mountoptions []string
+	if len(mountoption) > 0 {
+		mountoptions = []string{"minorversion=1", "sec=sys"}
+	} else {
+		mountoptions = nil
+	}
+	    
 	pv = &v1.PersistentVolume{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
@@ -559,6 +565,7 @@ func getPersistentVolumeSpec(fcdID string, persistentVolumeReclaimPolicy v1.Pers
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 			},
+            MountOptions:     mountoptions,
 			ClaimRef:         claimRef,
 			StorageClassName: "",
 		},
@@ -2229,7 +2236,7 @@ func createPod(client clientset.Interface, namespace string, nodeSelector map[st
 
 // getPersistentVolumeSpecForFileShare returns the PersistentVolume spec
 func getPersistentVolumeSpecForFileShare(fileshareID string, persistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy, labels map[string]string, accessMode v1.PersistentVolumeAccessMode) *v1.PersistentVolume {
-	pv := getPersistentVolumeSpec(fileshareID, persistentVolumeReclaimPolicy, labels)
+	pv := getPersistentVolumeSpec(fileshareID, persistentVolumeReclaimPolicy, labels, true)
 	pv.Spec.AccessModes = []v1.PersistentVolumeAccessMode{accessMode}
 	return pv
 }

@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"fmt"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"

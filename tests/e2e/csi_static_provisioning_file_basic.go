@@ -129,6 +129,9 @@ var _ = ginkgo.Describe("[csi-file-vanilla] Basic File Volume Static Provisionin
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		fileShareVolumeID := taskResult.GetCnsVolumeOperationResult().VolumeId.Id
 
+		ginkgo.By(fmt.Sprintf("Created file share volume is: %s", fileShareVolumeID))
+	
+
 		// Deleting the volume with deleteDisk set to false
 		ginkgo.By("Deleting the fileshare with deleteDisk set to false")
 		cnsDeleteReq := cnstypes.CnsDeleteVolume{

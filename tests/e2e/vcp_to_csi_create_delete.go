@@ -217,7 +217,7 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
         
 		//pks update cluster clusterName
 		ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates on kube-controller-manager")
-		pksCmd := fmt.Sprintf("/usr/bin/pks update-cluster %s", clusterName)
+		pksCmd := fmt.Sprintf("/usr/bin/pks update-cluster %s --config-file ~/enable_csi.json", clusterName)
 		op, err := exec.Command(pksCmd).Output()
 		fmt.Println(op)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())

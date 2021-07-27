@@ -283,59 +283,65 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 	   7.  Disable CSIMigration and CSIMigrationvSphere feature gates on kube-controller-manager (& restart)
 
 	*/
-	// ginkgo.It("Create volumes using VCP SC with parameters not supported by CSI before and after migration", func() {
-	// 	ctx, cancel := context.WithCancel(context.Background())
-	// 	defer cancel()
-	// 	log := logger.GetLogger(ctx)
-	// 	ginkgo.By("Creating VCP SCs")
-	// 	scParams := make(map[string]string)
-	// 	scParams[vcpScParamDatastoreName] = GetAndExpectStringEnvVar(envSharedDatastoreName)
-	// 	scParams["hostfailurestotolerate"] = "1"
-	// 	vcpSc, err := createVcpStorageClass(client, scParams, nil, "", "", false, "")
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	vcpScs = append(vcpScs, vcpSc)
+	ginkgo.It("Create volumes using VCP SC with parameters not supported by CSI before and after migration", func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		log := logger.GetLogger(ctx)
+		ginkgo.By("Creating VCP SCs")
+		scParams := make(map[string]string)
+		scParams[vcpScParamDatastoreName] = GetAndExpectStringEnvVar(envSharedDatastoreName)
+		scParams["hostfailurestotolerate"] = "1"
+		vcpSc, err := createVcpStorageClass(client, scParams, nil, "", "", false, "")
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		vcpScs = append(vcpScs, vcpSc)
 
-	// 	ginkgo.By("Creating VCP PVCs before migration")
-	// 	for _, sc := range vcpScs {
-	// 		pvc, err := createPVC(client, namespace, nil, "", sc, "")
-	// 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 		vcpPvcsPreMig = append(vcpPvcsPreMig, pvc)
-	// 	}
+		ginkgo.By("Creating VCP PVCs before migration")
+		for _, sc := range vcpScs {
+			pvc, err := createPVC(client, namespace, nil, "", sc, "")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			vcpPvcsPreMig = append(vcpPvcsPreMig, pvc)
+		}
 
-	// 	ginkgo.By("Waiting for all claims created before migration to be in bound state")
-	// 	vcpPvsPreMig, err = fpv.WaitForPVClaimBoundPhase(client, vcpPvcsPreMig, framework.ClaimProvisionTimeout)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.By("Waiting for all claims created before migration to be in bound state")
+		vcpPvsPreMig, err = fpv.WaitForPVClaimBoundPhase(client, vcpPvcsPreMig, framework.ClaimProvisionTimeout)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+        
+		ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates on kube-controller-manager")
+		pksCmd := fmt.Sprintf("pks update-cluster %s --config-file /home/kubo/enable_csi.json --wait --non-interactive", clusterName)
+		op, err := exec.Command("/bin/sh", "-c",pksCmd).Output()
+		fmt.Println(op)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	// 	ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates on kube-controller-manager")
-	// 	err = toggleCSIMigrationForTKGI(ctx, client, true)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	kcmMigEnabled = true
+		// ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates on kube-controller-manager")
+		// err = toggleCSIMigrationForTKGI(ctx, client, true)
+		// gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		// kcmMigEnabled = true
 
-	// 	ginkgo.By("Waiting for migration related annotations on PV/PVCs created before migration")
-	// 	waitForMigAnnotationsPvcPvLists(ctx, client, namespace, vcpPvcsPreMig, vcpPvsPreMig, true)
+		// ginkgo.By("Waiting for migration related annotations on PV/PVCs created before migration")
+		// waitForMigAnnotationsPvcPvLists(ctx, client, namespace, vcpPvcsPreMig, vcpPvsPreMig, true)
 
-	// 	ginkgo.By("Creating VCP PVCs after migration")
-	// 	pvc, err := createPVC(client, namespace, nil, "", vcpSc, "")
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	time.Sleep(30 * time.Second)
-	// 	ginkgo.By("Checking for error in events related to pvc " + pvc.Name)
-	// 	expectedErrorMsg := "InvalidArgument"
-	// 	// error looks like this:
-	// 	//     failed to provision volume with StorageClass "vcp-unsup-sc": rpc error: code = InvalidArgument desc = Parsing storage class parameters failed with error: vSphere CSI driver does not support creating volume using in-tree vSphere volume plugin parameter key:hostfailurestotolerate-migrationparam, value:1
-	// 	isFailureFound := checkEventsforError(client, namespace, metav1.ListOptions{FieldSelector: fmt.Sprintf("involvedObject.name=%s", pvc.Name)}, expectedErrorMsg)
-	// 	gomega.Expect(isFailureFound).To(gomega.BeTrue())
+		ginkgo.By("Creating VCP PVCs after migration")
+		pvc, err := createPVC(client, namespace, nil, "", vcpSc, "")
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		time.Sleep(30 * time.Second)
+		ginkgo.By("Checking for error in events related to pvc " + pvc.Name)
+		expectedErrorMsg := "InvalidArgument"
+		// error looks like this:
+		//     failed to provision volume with StorageClass "vcp-unsup-sc": rpc error: code = InvalidArgument desc = Parsing storage class parameters failed with error: vSphere CSI driver does not support creating volume using in-tree vSphere volume plugin parameter key:hostfailurestotolerate-migrationparam, value:1
+		isFailureFound := checkEventsforError(client, namespace, metav1.ListOptions{FieldSelector: fmt.Sprintf("involvedObject.name=%s", pvc.Name)}, expectedErrorMsg)
+		gomega.Expect(isFailureFound).To(gomega.BeTrue())
 
-	// 	ginkgo.By("Verify CnsVSphereVolumeMigration crds and CNS volume metadata for all volumes created before migration")
-	// 	for _, pvc := range vcpPvcsPreMig {
-	// 		vpath := getvSphereVolumePathFromClaim(ctx, client, namespace, pvc.Name)
-	// 		pv := getPvFromClaim(client, namespace, pvc.Name)
-	// 		log.Info("Processing PVC: " + pvc.Name)
-	// 		found, crd := getCnsVSphereVolumeMigrationCrd(ctx, vpath)
-	// 		gomega.Expect(found).To(gomega.BeTrue())
-	// 		err = waitAndVerifyCnsVolumeMetadata(crd.Spec.VolumeID, pvc, pv, nil)
-	// 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	}
-	// })
+		ginkgo.By("Verify CnsVSphereVolumeMigration crds and CNS volume metadata for all volumes created before migration")
+		for _, pvc := range vcpPvcsPreMig {
+			vpath := getvSphereVolumePathFromClaim(ctx, client, namespace, pvc.Name)
+			pv := getPvFromClaim(client, namespace, pvc.Name)
+			log.Info("Processing PVC: " + pvc.Name)
+			found, crd := getCnsVSphereVolumeMigrationCrd(ctx, vpath)
+			gomega.Expect(found).To(gomega.BeTrue())
+			err = waitAndVerifyCnsVolumeMetadata(crd.Spec.VolumeID, pvc, pv, nil)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		}
+	})
 
 	/*
 		create a PV from CSI using VCP SC with SC parameters supported by CSI when SPS service is down
@@ -384,137 +390,138 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 		12. Delete the SC1
 		13. Disable CSIMigration and CSIMigrationvSphere feature gates on kube-controller-manager (& restart)
 	*/
-	// ginkgo.It("Create/delete volumes using VCP SC via CSI when SPS/CNS service is down", func() {
-	// 	ctx, cancel := context.WithCancel(context.Background())
-	// 	defer cancel()
-	// 	log := logger.GetLogger(ctx)
-	// 	ginkgo.By("Creating VCP SCs")
-	// 	scParams := make(map[string]string)
-	// 	scParams[vcpScParamDatastoreName] = GetAndExpectStringEnvVar(envSharedDatastoreName)
-	// 	vcpSc, err := createVcpStorageClass(client, scParams, nil, "", "", false, "")
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	vcpScs = append(vcpScs, vcpSc)
+	ginkgo.It("Create/delete volumes using VCP SC via CSI when SPS/CNS service is down", func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		log := logger.GetLogger(ctx)
+		ginkgo.By("Creating VCP SCs")
+		scParams := make(map[string]string)
+		scParams[vcpScParamDatastoreName] = GetAndExpectStringEnvVar(envSharedDatastoreName)
+		vcpSc, err := createVcpStorageClass(client, scParams, nil, "", "", false, "")
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		vcpScs = append(vcpScs, vcpSc)
 
-	// 	ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates on kube-controller-manager")
-	// 	err = toggleCSIMigrationForTKGI(ctx, client, true)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	kcmMigEnabled = true
+		ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates on kube-controller-manager")
+		pksCmd := fmt.Sprintf("pks update-cluster %s --config-file /home/kubo/enable_csi.json --wait --non-interactive", clusterName)
+		op, err := exec.Command("/bin/sh", "-c",pksCmd).Output()
+		fmt.Println(op)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	// 	ginkgo.By("Creating PVC2...")
-	// 	pvc2, err := createPVC(client, namespace, nil, "", vcpSc, "")
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	vcpPvcsPostMig = append(vcpPvcsPostMig, pvc2)
 
-	// 	ginkgo.By("Waiting for all claims to be in bound state")
-	// 	vcpPvsPostMig, err = fpv.WaitForPVClaimBoundPhase(client, vcpPvcsPostMig, framework.ClaimProvisionTimeout)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	pv2 := vcpPvsPostMig[0]
+		ginkgo.By("Creating PVC2...")
+		pvc2, err := createPVC(client, namespace, nil, "", vcpSc, "")
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		vcpPvcsPostMig = append(vcpPvcsPostMig, pvc2)
 
-	// 	ginkgo.By("Verify CnsVSphereVolumeMigration crds and CNS volume metadata for PVC2")
-	// 	var vpath string
-	// 	var crd *migrationv1alpha1.CnsVSphereVolumeMigration
+		ginkgo.By("Waiting for all claims to be in bound state")
+		vcpPvsPostMig, err = fpv.WaitForPVClaimBoundPhase(client, vcpPvcsPostMig, framework.ClaimProvisionTimeout)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		pv2 := vcpPvsPostMig[0]
 
-	// 	vpath = getvSphereVolumePathFromClaim(ctx, client, namespace, pvc2.Name)
-	// 	log.Info("Processing PVC: " + pvc2.Name)
-	// 	var found bool
-	// 	found, crd = getCnsVSphereVolumeMigrationCrd(ctx, vpath)
-	// 	gomega.Expect(found).To(gomega.BeTrue())
-	// 	err = waitAndVerifyCnsVolumeMetadata(crd.Spec.VolumeID, pvc2, pv2, nil)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.By("Verify CnsVSphereVolumeMigration crds and CNS volume metadata for PVC2")
+		var vpath string
+		var crd *migrationv1alpha1.CnsVSphereVolumeMigration
 
-	// 	vcAddress := e2eVSphere.Config.Global.VCenterHostname + ":" + sshdPort
+		vpath = getvSphereVolumePathFromClaim(ctx, client, namespace, pvc2.Name)
+		log.Info("Processing PVC: " + pvc2.Name)
+		var found bool
+		found, crd = getCnsVSphereVolumeMigrationCrd(ctx, vpath)
+		gomega.Expect(found).To(gomega.BeTrue())
+		err = waitAndVerifyCnsVolumeMetadata(crd.Spec.VolumeID, pvc2, pv2, nil)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	// 	ginkgo.By(fmt.Sprintln("Stopping sps on the vCenter host"))
-	// 	isSPSserviceStopped = true
-	// 	err = invokeVCenterServiceControl("stop", "sps", vcAddress)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	ginkgo.By(fmt.Sprintf("Sleeping for %v seconds to allow sps to completely shutdown", vsanHealthServiceWaitTime))
-	// 	time.Sleep(time.Duration(vsanHealthServiceWaitTime) * time.Second)
+		vcAddress := e2eVSphere.Config.Global.VCenterHostname + ":" + sshdPort
 
-	// 	ginkgo.By("Creating PVC1...")
-	// 	pvc1, err := createPVC(client, namespace, nil, "", vcpSc, "")
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	vcpPvcsPostMig = append(vcpPvcsPostMig, pvc1)
+		ginkgo.By(fmt.Sprintln("Stopping sps on the vCenter host"))
+		isSPSserviceStopped = true
+		err = invokeVCenterServiceControl("stop", "sps", vcAddress)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.By(fmt.Sprintf("Sleeping for %v seconds to allow sps to completely shutdown", vsanHealthServiceWaitTime))
+		time.Sleep(time.Duration(vsanHealthServiceWaitTime) * time.Second)
 
-	// 	ginkgo.By("Sleeping for a min and verifying PVC1 is still in pending state")
-	// 	time.Sleep(1 * time.Minute)
+		ginkgo.By("Creating PVC1...")
+		pvc1, err := createPVC(client, namespace, nil, "", vcpSc, "")
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		vcpPvcsPostMig = append(vcpPvcsPostMig, pvc1)
 
-	// 	pvc1, err = client.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvc1.Name, metav1.GetOptions{})
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	gomega.Expect(pvc1.Status.Phase == v1.ClaimPending).To(gomega.BeTrue())
+		ginkgo.By("Sleeping for a min and verifying PVC1 is still in pending state")
+		time.Sleep(1 * time.Minute)
 
-	// 	ginkgo.By(fmt.Sprintln("Starting sps on the vCenter host"))
-	// 	err = invokeVCenterServiceControl("start", "sps", vcAddress)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	ginkgo.By(fmt.Sprintf("Sleeping for %v seconds to allow sps to come up again", vsanHealthServiceWaitTime))
-	// 	time.Sleep(time.Duration(vsanHealthServiceWaitTime) * time.Second)
-	// 	isSPSserviceStopped = false
+		pvc1, err = client.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvc1.Name, metav1.GetOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(pvc1.Status.Phase == v1.ClaimPending).To(gomega.BeTrue())
 
-	// 	ginkgo.By("Waiting for all claims to be in bound state")
-	// 	vcpPvsPostMig, err = fpv.WaitForPVClaimBoundPhase(client, vcpPvcsPostMig, framework.ClaimProvisionTimeout)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.By(fmt.Sprintln("Starting sps on the vCenter host"))
+		err = invokeVCenterServiceControl("start", "sps", vcAddress)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.By(fmt.Sprintf("Sleeping for %v seconds to allow sps to come up again", vsanHealthServiceWaitTime))
+		time.Sleep(time.Duration(vsanHealthServiceWaitTime) * time.Second)
+		isSPSserviceStopped = false
 
-	// 	ginkgo.By(fmt.Sprintln("Stopping vsan-health on the vCenter host"))
-	// 	isVsanHealthServiceStopped = true
-	// 	err = invokeVCenterServiceControl("stop", vsanhealthServiceName, vcAddress)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	ginkgo.By(fmt.Sprintf("Sleeping for %v seconds to allow sps to completely shutdown", vsanHealthServiceWaitTime))
-	// 	time.Sleep(time.Duration(vsanHealthServiceWaitTime) * time.Second)
+		ginkgo.By("Waiting for all claims to be in bound state")
+		vcpPvsPostMig, err = fpv.WaitForPVClaimBoundPhase(client, vcpPvcsPostMig, framework.ClaimProvisionTimeout)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	// 	ginkgo.By("Creating PVC3...")
-	// 	pvc3, err := createPVC(client, namespace, nil, "", vcpSc, "")
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	vcpPvcsPostMig = append(vcpPvcsPostMig, pvc3)
+		ginkgo.By(fmt.Sprintln("Stopping vsan-health on the vCenter host"))
+		isVsanHealthServiceStopped = true
+		err = invokeVCenterServiceControl("stop", vsanhealthServiceName, vcAddress)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.By(fmt.Sprintf("Sleeping for %v seconds to allow sps to completely shutdown", vsanHealthServiceWaitTime))
+		time.Sleep(time.Duration(vsanHealthServiceWaitTime) * time.Second)
 
-	// 	ginkgo.By("Deleting PVC2...")
-	// 	err = client.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, pvc2.Name, *metav1.NewDeleteOptions(0))
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.By("Creating PVC3...")
+		pvc3, err := createPVC(client, namespace, nil, "", vcpSc, "")
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		vcpPvcsPostMig = append(vcpPvcsPostMig, pvc3)
 
-	// 	ginkgo.By("Sleeping for a min and verifying PVC3 is still in pending state")
-	// 	time.Sleep(1 * time.Minute)
+		ginkgo.By("Deleting PVC2...")
+		err = client.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, pvc2.Name, *metav1.NewDeleteOptions(0))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	// 	pvc3, err = client.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvc3.Name, metav1.GetOptions{})
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	gomega.Expect(pvc3.Status.Phase == v1.ClaimPending).To(gomega.BeTrue())
+		ginkgo.By("Sleeping for a min and verifying PVC3 is still in pending state")
+		time.Sleep(1 * time.Minute)
 
-	// 	ginkgo.By(fmt.Sprintln("Starting vsan-health on the vCenter host"))
-	// 	err = invokeVCenterServiceControl("start", vsanhealthServiceName, vcAddress)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	ginkgo.By(fmt.Sprintf("Sleeping for %v seconds to allow sps to come up again", vsanHealthServiceWaitTime))
-	// 	time.Sleep(time.Duration(vsanHealthServiceWaitTime) * time.Second)
-	// 	isVsanHealthServiceStopped = false
+		pvc3, err = client.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvc3.Name, metav1.GetOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(pvc3.Status.Phase == v1.ClaimPending).To(gomega.BeTrue())
 
-	// 	vcpPvcsPostMig = append([]*v1.PersistentVolumeClaim{}, pvc1, pvc3)
-	// 	ginkgo.By("Waiting for all claims to be in bound state")
-	// 	vcpPvsPostMig, err = fpv.WaitForPVClaimBoundPhase(client, vcpPvcsPostMig, framework.ClaimProvisionTimeout)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.By(fmt.Sprintln("Starting vsan-health on the vCenter host"))
+		err = invokeVCenterServiceControl("start", vsanhealthServiceName, vcAddress)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.By(fmt.Sprintf("Sleeping for %v seconds to allow sps to come up again", vsanHealthServiceWaitTime))
+		time.Sleep(time.Duration(vsanHealthServiceWaitTime) * time.Second)
+		isVsanHealthServiceStopped = false
 
-	// 	err = e2eVSphere.waitForCNSVolumeToBeDeleted(crd.Spec.VolumeID)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		vcpPvcsPostMig = append([]*v1.PersistentVolumeClaim{}, pvc1, pvc3)
+		ginkgo.By("Waiting for all claims to be in bound state")
+		vcpPvsPostMig, err = fpv.WaitForPVClaimBoundPhase(client, vcpPvcsPostMig, framework.ClaimProvisionTimeout)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	// 	framework.Logf("Waiting for vmdk %v to be deleted", vpath)
-	// 	err = waitForVmdkDeletion(ctx, vpath)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	framework.Logf("Waiting for CnsVSphereVolumeMigration crds %v to be deleted", crd.Spec.VolumeID)
-	// 	err = waitForCnsVSphereVolumeMigrationCrdToBeDeleted(ctx, crd)
-	// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		err = e2eVSphere.waitForCNSVolumeToBeDeleted(crd.Spec.VolumeID)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	// 	ginkgo.By("Verify annotations on PV/PVCs")
-	// 	waitForMigAnnotationsPvcPvLists(ctx, client, namespace, vcpPvcsPostMig, vcpPvsPostMig, false)
+		framework.Logf("Waiting for vmdk %v to be deleted", vpath)
+		err = waitForVmdkDeletion(ctx, vpath)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.Logf("Waiting for CnsVSphereVolumeMigration crds %v to be deleted", crd.Spec.VolumeID)
+		err = waitForCnsVSphereVolumeMigrationCrdToBeDeleted(ctx, crd)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	// 	ginkgo.By("Wait and verify CNS entries for all CNS volumes and CnsVSphereVolumeMigration CRDs to get ")
-	// 	for _, pvc := range vcpPvcsPostMig {
-	// 		vpath = getvSphereVolumePathFromClaim(ctx, client, namespace, pvc.Name)
-	// 		log.Info("Processing PVC: " + pvc.Name)
-	// 		pv := getPvFromClaim(client, namespace, pvc.Name)
-	// 		var found bool
-	// 		found, crd = getCnsVSphereVolumeMigrationCrd(ctx, vpath)
-	// 		gomega.Expect(found).To(gomega.BeTrue())
-	// 		err = waitAndVerifyCnsVolumeMetadata(crd.Spec.VolumeID, pvc, pv, nil)
-	// 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	// 	}
-	// })
+		ginkgo.By("Verify annotations on PV/PVCs")
+		waitForMigAnnotationsPvcPvLists(ctx, client, namespace, vcpPvcsPostMig, vcpPvsPostMig, false)
 
+		ginkgo.By("Wait and verify CNS entries for all CNS volumes and CnsVSphereVolumeMigration CRDs to get ")
+		for _, pvc := range vcpPvcsPostMig {
+			vpath = getvSphereVolumePathFromClaim(ctx, client, namespace, pvc.Name)
+			log.Info("Processing PVC: " + pvc.Name)
+			pv := getPvFromClaim(client, namespace, pvc.Name)
+			var found bool
+			found, crd = getCnsVSphereVolumeMigrationCrd(ctx, vpath)
+			gomega.Expect(found).To(gomega.BeTrue())
+			err = waitAndVerifyCnsVolumeMetadata(crd.Spec.VolumeID, pvc, pv, nil)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		}
+	})
 })
 
 // waitForMigAnnotationsPvcPvLists waits for the list PVs and PVCs to have migration related annotatations

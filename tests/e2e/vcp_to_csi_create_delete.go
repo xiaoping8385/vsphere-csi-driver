@@ -227,8 +227,8 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 		// gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		// kcmMigEnabled = true
 
-		// ginkgo.By("Waiting for migration related annotations on PV/PVCs created before migration")
-		// waitForMigAnnotationsPvcPvLists(ctx, client, namespace, vcpPvcsPreMig, vcpPvsPreMig, true)
+		ginkgo.By("Waiting for migration related annotations on PV/PVCs created before migration")
+		waitForMigAnnotationsPvcPvLists(ctx, client, namespace, vcpPvcsPreMig, vcpPvsPreMig, true)
 
 		ginkgo.By("Creating VCP PVCs after migration")
 		for _, sc := range vcpScs {
@@ -317,8 +317,8 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 		// gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		// kcmMigEnabled = true
 
-		// ginkgo.By("Waiting for migration related annotations on PV/PVCs created before migration")
-		// waitForMigAnnotationsPvcPvLists(ctx, client, namespace, vcpPvcsPreMig, vcpPvsPreMig, true)
+		ginkgo.By("Waiting for migration related annotations on PV/PVCs created before migration")
+		waitForMigAnnotationsPvcPvLists(ctx, client, namespace, vcpPvcsPreMig, vcpPvsPreMig, true)
 
 		ginkgo.By("Creating VCP PVCs after migration")
 		pvc, err := createPVC(client, namespace, nil, "", vcpSc, "")

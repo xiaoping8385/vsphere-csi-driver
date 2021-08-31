@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,10 +38,8 @@ import (
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25/mo"
-	"github.com/vmware/govmomi/vim25/types"
 	vim25types "github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/crypto/ssh"
-	apps "k8s.io/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -52,20 +50,22 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	pkgtypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubectl/pkg/drain"
 	"k8s.io/kubernetes/test/e2e/framework"
+	fdep "k8s.io/kubernetes/test/e2e/framework/deployment"
+	"k8s.io/kubernetes/test/e2e/framework/manifest"
 	fpod "k8s.io/kubernetes/test/e2e/framework/pod"
 	fpv "k8s.io/kubernetes/test/e2e/framework/pv"
 	fssh "k8s.io/kubernetes/test/e2e/framework/ssh"
-	"k8s.io/kubernetes/test/e2e/manifest"
 
 	cnsoperatorv1alpha1 "sigs.k8s.io/vsphere-csi-driver/pkg/apis/cnsoperator"
 	cnsnodevmattachmentv1alpha1 "sigs.k8s.io/vsphere-csi-driver/pkg/apis/cnsoperator/cnsnodevmattachment/v1alpha1"
-	"sigs.k8s.io/vsphere-csi-driver/pkg/apis/cnsoperator/cnsregistervolume/v1alpha1"
 	cnsregistervolumev1alpha1 "sigs.k8s.io/vsphere-csi-driver/pkg/apis/cnsoperator/cnsregistervolume/v1alpha1"
 	cnsvolumemetadatav1alpha1 "sigs.k8s.io/vsphere-csi-driver/pkg/apis/cnsoperator/cnsvolumemetadata/v1alpha1"
 	"sigs.k8s.io/vsphere-csi-driver/pkg/csi/service/logger"
@@ -79,6 +79,7 @@ var (
 	clusterComputeResource []*object.ClusterComputeResource
 	hosts                  []*object.HostSystem
 	defaultDatastore       *object.Datastore
+	restConfig             *rest.Config
 )
 
 // getVSphereStorageClassSpec returns Storage Class Spec with supplied storage class parameters
@@ -185,7 +186,7 @@ func getVMUUIDFromNodeName(nodeName string) (string, error) {
 
 // verifyVolumeMetadataInCNS verifies container volume metadata is matching the one is CNS cache
 func verifyVolumeMetadataInCNS(vs *vSphere, volumeID string, PersistentVolumeClaimName string, PersistentVolumeName string,
-	PodName string, Labels ...types.KeyValue) error {
+	PodName string, Labels ...vim25types.KeyValue) error {
 	queryResult, err := vs.queryCNSVolumeWithResult(volumeID)
 	if err != nil {
 		return err
@@ -360,6 +361,7 @@ func createStatefulSetWithOneReplica(client clientset.Interface, manifestPath st
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	return statefulSet, service
 }
+
 // updateDeploymentReplicawithWait helps to update the replica for a deployment with wait
 func updateDeploymentReplicawithWait(client clientset.Interface, count int32, name string, namespace string) error {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -386,6 +388,7 @@ func updateDeploymentReplicawithWait(client clientset.Interface, count int32, na
 	})
 	return waitErr
 }
+
 // updateDeploymentReplica helps to update the replica for a deployment
 func updateDeploymentReplica(client clientset.Interface, count int32, name string, namespace string) *appsv1.Deployment {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -730,7 +733,7 @@ func invokeVCenterChangePassword(user, adminPassword, newPassword, host string) 
 // match the topology constraints specified in the storage class
 func verifyVolumeTopology(pv *v1.PersistentVolume, zoneValues []string, regionValues []string) (string, string, error) {
 	if pv.Spec.NodeAffinity == nil || len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
-		return "", "", fmt.Errorf("Node Affinity rules for PV should exist in topology aware provisioning")
+		return "", "", fmt.Errorf("node Affinity rules for PV should exist in topology aware provisioning")
 	}
 	var pvZone string
 	var pvRegion string
@@ -779,7 +782,7 @@ func getTopologyFromPod(pod *v1.Pod, nodeList *v1.NodeList) (string, string, err
 			return podRegion, podZone, nil
 		}
 	}
-	err := errors.New("Could not find the topology from pod")
+	err := errors.New("could not find the topology from pod")
 	return "", "", err
 }
 
@@ -1109,7 +1112,7 @@ func getCnsNodeVMAttachmentByName(ctx context.Context, f *framework.Framework, e
 	return nil
 }
 
-//verifyIsAttachedInSupervisor verifies the crd instance is attached in supervisior
+//verifyIsAttachedInSupervisor verifies the crd instance is attached in supervisor
 func verifyIsAttachedInSupervisor(ctx context.Context, f *framework.Framework, expectedInstanceName string, crdVersion string, crdGroup string) {
 	instance := getCnsNodeVMAttachmentByName(ctx, f, expectedInstanceName, crdVersion, crdGroup)
 	if instance != nil {
@@ -1119,7 +1122,7 @@ func verifyIsAttachedInSupervisor(ctx context.Context, f *framework.Framework, e
 	gomega.Expect(instance).NotTo(gomega.BeNil())
 }
 
-//verifyIsDetachedInSupervisor verifies the crd instance is detached from supervisior
+//verifyIsDetachedInSupervisor verifies the crd instance is detached from supervisor
 func verifyIsDetachedInSupervisor(ctx context.Context, f *framework.Framework, expectedInstanceName string, crdVersion string, crdGroup string) {
 	instance := getCnsNodeVMAttachmentByName(ctx, f, expectedInstanceName, crdVersion, crdGroup)
 	if instance != nil {
@@ -1514,6 +1517,7 @@ func verifyBidirectionalReferenceOfPVandPVC(ctx context.Context, client clientse
 		log.Errorf("Mismatch in pv capacity:%d and pvc capacity: %d", pvcapacity, pvccapacity)
 	}
 }
+
 //Get CNS register volume
 func getCNSRegistervolume(ctx context.Context, restClientConfig *rest.Config, cnsRegisterVolume *cnsregistervolumev1alpha1.CnsRegisterVolume) *cnsregistervolumev1alpha1.CnsRegisterVolume {
 	cnsOperatorClient, err := k8s.NewClientForGroup(ctx, restClientConfig, cnsoperatorv1alpha1.GroupName)
@@ -1944,6 +1948,7 @@ func getPersistentVolumeSpecWithStorageclass(volumeHandle string, persistentVolu
 	pv.Annotations = annotations
 	return pv
 }
+
 // getPVCSpecWithPVandStorageClass is to create PVC spec with given PV , storage class and label details
 func getPVCSpecWithPVandStorageClass(pvcName string, namespace string, labels map[string]string, pvName string, storageclass string, sizeOfDisk string) *v1.PersistentVolumeClaim {
 	pvc := &v1.PersistentVolumeClaim{
@@ -1970,6 +1975,7 @@ func getPVCSpecWithPVandStorageClass(pvcName string, namespace string, labels ma
 
 	return pvc
 }
+
 //waitForEvent waits for and event with specified message substr for a given object name
 func waitForEvent(ctx context.Context, client clientset.Interface, namespace string, substr string, name string) error {
 	waitErr := wait.PollImmediate(poll, pollTimeoutShort, func() (bool, error) {

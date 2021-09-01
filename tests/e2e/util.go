@@ -83,7 +83,7 @@ var (
 )
 
 // getVSphereStorageClassSpec returns Storage Class Spec with supplied storage class parameters
-func getVSphereStorageClassSpec(scName string, scParameters map[string]string, allowedTopologies []v1.TopologySelectorLabelRequirement, scReclaimPolicy v1.PersistentVolumeReclaimPolicy, bindingMode storagev1.VolumeBindingMode, allowVolumeExpansion bool) *storagev1.StorageClass {
+func getVSphereStorageClassSpec(scName string, scParameters map[string]string, allowedTopologies []v1.TopologySelectorLabelRequirement, scReclaimPolicy v1.PersistentVolumeReclaimPolicy, bindingMode storagev1.VolumeBindingMode, allowVolumeExpansion bool, mountoption ...bool) *storagev1.StorageClass {
 	if bindingMode == "" {
 		bindingMode = storagev1.VolumeBindingImmediate
 	}
@@ -104,7 +104,15 @@ func getVSphereStorageClassSpec(scName string, scParameters map[string]string, a
 	}
 	if scParameters != nil {
 		sc.Parameters = scParameters
+		// if scParameters["csi.storage.k8s.io/fstype"] == "nfs4" || scParameters["fstype"] == "nfs4"  {
+		// 	sc.MountOptions = []string{"minorversion=1", "sec=sys"}
+		// }
 	}
+
+	if len(mountoption) > 0  {
+		sc.MountOptions = []string{"minorversion=1", "sec=sys"}
+	}
+
 	if allowedTopologies != nil {
 		sc.AllowedTopologies = []v1.TopologySelectorTerm{
 			{
@@ -288,9 +296,20 @@ func createPVCAndStorageClass(client clientset.Interface, pvcnamespace string, p
 	if len(names) > 0 {
 		scName = names[0]
 	}
-	storageclass, err := createStorageClass(client, scParameters, allowedTopologies, "", bindingMode, allowVolumeExpansion, scName)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
+	// if scParameters["csi.storage.k8s.io/fstype"] == "nfs4" || scParameters["fstype"] == "nfs4"  {
+		// 	sc.MountOptions = []string{"minorversion=1", "sec=sys"}
+		// }
+	var storageclass *storagev1.StorageClass
+	var err error
+	if accessMode == v1.ReadWriteMany {
+		storageclass, err = createStorageClass(client, scParameters, allowedTopologies, "", bindingMode, allowVolumeExpansion, scName, true)
+
+	}else{
+		storageclass, err = createStorageClass(client, scParameters, allowedTopologies, "", bindingMode, allowVolumeExpansion, scName)
+	}
+	  
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	pvclaim, err := createPVC(client, pvcnamespace, pvclaimlabels, ds, storageclass, accessMode)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -299,13 +318,20 @@ func createPVCAndStorageClass(client clientset.Interface, pvcnamespace string, p
 
 // createStorageClass helps creates a storage class with specified name, storageclass parameters
 func createStorageClass(client clientset.Interface, scParameters map[string]string, allowedTopologies []v1.TopologySelectorLabelRequirement,
-	scReclaimPolicy v1.PersistentVolumeReclaimPolicy, bindingMode storagev1.VolumeBindingMode, allowVolumeExpansion bool, scName string) (*storagev1.StorageClass, error) {
+	scReclaimPolicy v1.PersistentVolumeReclaimPolicy, bindingMode storagev1.VolumeBindingMode, allowVolumeExpansion bool, scName string, mountoption ...bool) (*storagev1.StorageClass, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ginkgo.By(fmt.Sprintf("Creating StorageClass %s with scParameters: %+v and allowedTopologies: %+v and ReclaimPolicy: %+v and allowVolumeExpansion: %t", scName, scParameters, allowedTopologies, scReclaimPolicy, allowVolumeExpansion))
-	storageclass, err := client.StorageV1().StorageClasses().Create(ctx, getVSphereStorageClassSpec(scName, scParameters, allowedTopologies, scReclaimPolicy, bindingMode, allowVolumeExpansion), metav1.CreateOptions{})
+	var storageclass *storagev1.StorageClass
+	var err error
+	if len(mountoption) > 0{
+        storageclass, err = client.StorageV1().StorageClasses().Create(ctx, getVSphereStorageClassSpec(scName, scParameters, allowedTopologies, scReclaimPolicy, bindingMode, allowVolumeExpansion, true), metav1.CreateOptions{})
+	} else {
+		storageclass, err = client.StorageV1().StorageClasses().Create(ctx, getVSphereStorageClassSpec(scName, scParameters, allowedTopologies, scReclaimPolicy, bindingMode, allowVolumeExpansion), metav1.CreateOptions{})
+	}
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
 	return storageclass, err
+
 }
 
 // createPVC helps creates pvc with given namespace and labels using given storage class
@@ -531,7 +557,7 @@ func getPersistentVolumeClaimSpec(namespace string, labels map[string]string, pv
 }
 
 // function to create PV volume spec with given FCD ID, Reclaim Policy and labels
-func getPersistentVolumeSpec(fcdID string, persistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy, labels map[string]string) *v1.PersistentVolume {
+func getPersistentVolumeSpec(fcdID string, persistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy, labels map[string]string, mountoption ...bool) *v1.PersistentVolume {
 	var (
 		pvConfig fpv.PersistentVolumeConfig
 		pv       *v1.PersistentVolume
@@ -549,7 +575,13 @@ func getPersistentVolumeSpec(fcdID string, persistentVolumeReclaimPolicy v1.Pers
 		},
 		Prebind: nil,
 	}
-
+	var mountoptions []string
+	if len(mountoption) > 0 {
+		mountoptions = []string{"minorversion=1", "sec=sys"}
+	} else {
+		mountoptions = nil
+	}
+	    
 	pv = &v1.PersistentVolume{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
@@ -564,6 +596,7 @@ func getPersistentVolumeSpec(fcdID string, persistentVolumeReclaimPolicy v1.Pers
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 			},
+            MountOptions:     mountoptions,
 			ClaimRef:         claimRef,
 			StorageClassName: "",
 		},
@@ -1315,7 +1348,7 @@ func trimQuotes(str string) string {
 		[Global]
 		insecure-flag = "true"
 		cluster-id = "domain-c1047"
-		cluster-distribution = "CSI-Vanilla"
+        cluster-distribution = "CSI-Vanilla"
 		[VirtualCenter "wdc-rdops-vm09-dhcp-238-224.eng.vmware.com"]
 		user = "workload_storage_management-792c9cce-3cd2-4618-8853-52f521400e05@vsphere.local"
 		password = "qd?\\/\"K=O_<ZQw~s4g(S"
@@ -1652,7 +1685,8 @@ func getPersistentVolumeSpecFromVolume(volumeID string, persistentVolumeReclaimP
 	// Annotation needed to delete a statically created pv
 	annotations := make(map[string]string)
 	annotations["pv.kubernetes.io/provisioned-by"] = e2evSphereCSIDriverName
-
+	mountoptions := []string{"minorversion=1", "sec=sys"}
+    
 	pv = &v1.PersistentVolume{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
@@ -1671,6 +1705,7 @@ func getPersistentVolumeSpecFromVolume(volumeID string, persistentVolumeReclaimP
 			},
 			ClaimRef:         claimRef,
 			StorageClassName: "",
+			MountOptions: mountoptions,
 		},
 		Status: v1.PersistentVolumeStatus{},
 	}
@@ -1678,7 +1713,7 @@ func getPersistentVolumeSpecFromVolume(volumeID string, persistentVolumeReclaimP
 }
 
 // DeleteStatefulPodAtIndex deletes pod given index in the desired statefulset
-func DeleteStatefulPodAtIndex(client clientset.Interface, index int, ss *appsv1.StatefulSet) {
+func DeleteStatefulPodAtIndex(client clientset.Interface, index int, ss *apps.StatefulSet) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	name := fmt.Sprintf("%v-%v", ss.Name, index)

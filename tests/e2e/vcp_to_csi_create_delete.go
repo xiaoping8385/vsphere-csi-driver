@@ -19,6 +19,8 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"reflect"
 	"strings"
 	"time"
@@ -26,6 +28,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	_"k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	cns "github.com/vmware/govmomi/cns"
 	cnstypes "github.com/vmware/govmomi/cns/types"
 	"github.com/vmware/govmomi/vim25/types"
@@ -61,7 +64,7 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 		isSPSserviceStopped        bool
 		isVsanHealthServiceStopped bool
 	)
-
+	clusterName  := os.Getenv("CLUSTERNAME")	
 	ginkgo.BeforeEach(func() {
 		client = f.ClientSet
 		namespace = f.Namespace.Name
@@ -74,7 +77,7 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		generateNodeMap(ctx, testConfig, &e2eVSphere, client)
-		err = toggleCSIMigrationFeatureGatesOnKubeControllerManager(ctx, client, false)
+	//	err = toggleCSIMigrationFeatureGatesOnKubeControllerManager(ctx, client, false)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		kcmMigEnabled = false
 	})
@@ -133,10 +136,10 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 		vcpPvsPreMig = []*v1.PersistentVolume{}
 		vcpPvsPostMig = []*v1.PersistentVolume{}
 
-		if kcmMigEnabled {
-			err = toggleCSIMigrationFeatureGatesOnKubeControllerManager(ctx, client, false)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		}
+		// if kcmMigEnabled {
+		// 	err = toggleCSIMigrationFeatureGatesOnKubeControllerManager(ctx, client, false)
+		// 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		// }
 
 		var scsToDelete []*storagev1.StorageClass
 		scsToDelete = append(scsToDelete, vcpScs...)
@@ -218,11 +221,17 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 		ginkgo.By("Waiting for all claims created before migration to be in bound state")
 		vcpPvsPreMig, err = fpv.WaitForPVClaimBoundPhase(client, vcpPvcsPreMig, framework.ClaimProvisionTimeout)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
+		//pks update cluster clusterName
 		ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates on kube-controller-manager")
-		err = toggleCSIMigrationFeatureGatesOnKubeControllerManager(ctx, client, true)
+		pksCmd := fmt.Sprintf("pks update-cluster %s --config-file /home/kubo/enable_csi.json --wait --non-interactive", clusterName)
+		op, err := exec.Command("/bin/sh", "-c",pksCmd).Output()
+		fmt.Println(op)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		kcmMigEnabled = true
+
+		// ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates on kube-controller-manager")
+		// err = toggleCSIMigrationFeatureGatesOnKubeControllerManager(ctx, client, true)
+		// gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		// kcmMigEnabled = true
 
 		ginkgo.By("Waiting for migration related annotations on PV/PVCs created before migration")
 		waitForMigAnnotationsPvcPvLists(ctx, client, vcpPvcsPreMig, vcpPvsPreMig, true)

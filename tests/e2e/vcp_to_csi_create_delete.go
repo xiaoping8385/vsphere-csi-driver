@@ -64,7 +64,8 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 		isSPSserviceStopped        bool
 		isVsanHealthServiceStopped bool
 	)
-	clusterName  := os.Getenv("CLUSTERNAME")	
+	clusterName  := os.Getenv("CLUSTERNAME")
+	jsonpath     := os.Getenv("JSONPATH")
 	ginkgo.BeforeEach(func() {
 		client = f.ClientSet
 		namespace = f.Namespace.Name
@@ -223,7 +224,7 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		//pks update cluster clusterName
 		ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates on kube-controller-manager")
-		pksCmd := fmt.Sprintf("pks update-cluster %s --config-file /home/kubo/enable_csi.json --wait --non-interactive", clusterName)
+		pksCmd := fmt.Sprintf("pks update-cluster %s --config-file %s --wait --non-interactive", clusterName,jsonpath)
 		op, err := exec.Command("/bin/sh", "-c",pksCmd).Output()
 		fmt.Println(op)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())

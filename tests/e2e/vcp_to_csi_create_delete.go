@@ -226,7 +226,7 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 		ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates with pks command")
 		pksCmd := fmt.Sprintf("pks update-cluster %s --config-file %s --wait --non-interactive", clusterName,jsonpath)
 		ginkgo.By(pksCmd)
-		op, err := exec.Command("/bin/sh", "-c","pks").Output()
+		op, err := exec.Command("/bin/sh", "-c", pksCmd).Output()
 		
 		ginkgo.By(fmt.Sprintf("result is %s", op))
 		

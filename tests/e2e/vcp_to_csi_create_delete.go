@@ -223,10 +223,14 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 		vcpPvsPreMig, err = fpv.WaitForPVClaimBoundPhase(client, vcpPvcsPreMig, framework.ClaimProvisionTimeout)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		//pks update cluster clusterName
-		ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates on kube-controller-manager")
+		ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates with pks command")
 		pksCmd := fmt.Sprintf("pks update-cluster %s --config-file %s --wait --non-interactive", clusterName,jsonpath)
+		ginkgo.By(fmt.Sprintf("pks update-cluster %s --config-file %s --wait --non-interactive", clusterName,jsonpath))
 		op, err := exec.Command("/bin/sh", "-c",pksCmd).Output()
-		fmt.Println(op)
+		
+		ginkgo.By(fmt.Sprintf("result is %s", op))
+		time.Sleep(30 * time.Minute)
+		
 		//gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates on kube-controller-manager")

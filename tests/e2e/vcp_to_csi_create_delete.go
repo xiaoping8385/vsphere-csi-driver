@@ -64,8 +64,11 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 		isSPSserviceStopped        bool
 		isVsanHealthServiceStopped bool
 	)
-	clusterName  := os.Getenv("CLUSTERNAME")
-	jsonpath     := os.Getenv("JSONPATH")
+	// clusterName  := os.Getenv("CLUSTERNAME")
+	// jsonpath     := os.Getenv("JSONPATH")
+	bosh_deployment  := os.Getenv("BOSH_DEPLOYMENT")
+	old_manifest_yml     := os.Getenv("OLD_MANIFEST_PATH")
+	new_manifest_yml     := os.Getenv("NEW_MANIFEST_PATH")
 	ginkgo.BeforeEach(func() {
 		client = f.ClientSet
 		namespace = f.Namespace.Name
@@ -223,8 +226,8 @@ var _ = ginkgo.Describe("[csi-vcp-mig] VCP to CSI migration create/delete tests"
 		vcpPvsPreMig, err = fpv.WaitForPVClaimBoundPhase(client, vcpPvcsPreMig, framework.ClaimProvisionTimeout)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		//pks update cluster clusterName
-		ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates with pks command")
-		pksCmd := fmt.Sprintf("pks update-cluster %s --config-file %s --wait --non-interactive", clusterName,jsonpath)
+		ginkgo.By("Enabling CSIMigration and CSIMigrationvSphere feature gates with bosh command")
+		pksCmd := fmt.Sprintf("echo \"y\" | bosh-cli -d %s deploy %s -o %s", bosh_deployment,old_manifest_yml,new_manifest_yml)
 		ginkgo.By(pksCmd)
 		op, err := exec.Command("/bin/sh", "-c", pksCmd).Output()
 		
